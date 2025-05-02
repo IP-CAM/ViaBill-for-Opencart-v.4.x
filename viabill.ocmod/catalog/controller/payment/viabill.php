@@ -337,8 +337,8 @@ class Viabill extends \Opencart\System\Engine\Controller {
                 $append_selector = !empty($this->config->get($config_prefix.'append_selector'))?$this->config->get($config_prefix.'append_selector'):'.price';
                 $append_after = !empty($this->config->get($config_prefix.'append_after'))?true:false;
                 $append_first = true;
-                $alignment = $this->config->get($config_common_prefix.'align');
-                $width = $this->config->get($config_common_prefix.'width');
+                $alignment = $this->config->get($config_prefix.'align');
+                $width = $this->config->get($config_prefix.'width');
 
                 $price = $data['price'];
                 if (!empty($dynamic_price)) {
@@ -358,18 +358,18 @@ class Viabill extends \Opencart\System\Engine\Controller {
                     'append_selector' => $append_selector,
                     'append_after' => $append_after,
                     'append_first' => $append_first,
-                    'alignment' => $alignment
+                    'alignment' => $alignment,
+                    'width' => $width
                 ];               
 
-                $pricetagScript = $this->getViabillPricetagScript($pricetag_params).
-                                  str_replace(['&lt;','&gt;'],['<','>'],$pricetag_content);
+                $pricetagScript = $this->getViabillPricetagScript($pricetag_params, str_replace(['&lt;','&gt;'],['<','>'],$pricetag_content));
 
                 $priceTagCSS = $this->getViabillPricetagCSS($pricetag_params);
 			}
 
             if (!empty($pricetagScript) && is_string($output)) {
                 // Insert the script before </body> (assuming output is HTML)
-                $output = str_replace('</body>', $pricetagScript . '</body>', $output);
+                $output = str_replace('</body>', $priceTagCSS.$pricetagScript . '</body>', $output);
             }                        
         }
     }
@@ -404,8 +404,8 @@ class Viabill extends \Opencart\System\Engine\Controller {
                  $append_selector = !empty($this->config->get($config_prefix.'append_selector'))?$this->config->get($config_prefix.'append_selector'):'.price';
                  $append_after = !empty($this->config->get($config_prefix.'append_after'))?true:false;
                  $append_first = true;
-                 $$alignment = $this->config->get($config_common_prefix.'align');
-                 $width = $this->config->get($config_common_prefix.'width');
+                 $alignment = $this->config->get($config_prefix.'align');
+                 $width = $this->config->get($config_prefix.'width');
  
                  $price = $this->cart->getTotal();
                  if (!empty($dynamic_price)) {
@@ -425,18 +425,18 @@ class Viabill extends \Opencart\System\Engine\Controller {
                      'append_selector' => $append_selector,
                      'append_after' => $append_after,
                      'append_first' => $append_first,
-                     'alignment' => $alignment
+                     'alignment' => $alignment,
+                     'width' => $width
                  ];               
  
-                 $pricetagScript = $this->getViabillPricetagScript($pricetag_params).
-                                   str_replace(['&lt;','&gt;'],['<','>'],$pricetag_content);
+                 $pricetagScript = $this->getViabillPricetagScript($pricetag_params, str_replace(['&lt;','&gt;'],['<','>'],$pricetag_content));
 
                  $priceTagCSS = $this->getViabillPricetagCSS($pricetag_params);                  
              }
  
              if (!empty($pricetagScript) && is_string($output)) {
                  // Insert the script before </body> (assuming output is HTML)
-                 $output = str_replace('</body>', $pricetagScript . '</body>', $output);
+                 $output = str_replace('</body>', $priceTagCSS.$pricetagScript . '</body>', $output);
              }                                               
         }
     }
@@ -479,8 +479,8 @@ class Viabill extends \Opencart\System\Engine\Controller {
                     $append_selector = !empty($this->config->get($config_prefix.'append_selector'))?$this->config->get($config_prefix.'append_selector'):'.price';
                     $append_after = !empty($this->config->get($config_prefix.'append_after'))?true:false;
                     $append_first = true;
-                    $alignment = $this->config->get($config_common_prefix.'align');
-                    $width = $this->config->get($config_common_prefix.'width');
+                    $alignment = $this->config->get($config_prefix.'align');
+                    $width = $this->config->get($config_prefix.'width');
 
                     $price = $this->cart->getTotal();
                     if (!empty($dynamic_price)) {
@@ -501,25 +501,24 @@ class Viabill extends \Opencart\System\Engine\Controller {
                         'append_after' => $append_after,
                         'append_first' => $append_first,
                         'alignment' => $alignment,
-                        'width' => $width
+                        'width' => $width,                        
                     ];               
 
-                    $pricetagScript = $this->getViabillPricetagScript($pricetag_params).
-                                    str_replace(['&lt;','&gt;'],['<','>'],$pricetag_content);
+                    $pricetagScript = $this->getViabillPricetagScript($pricetag_params, str_replace(['&lt;','&gt;'],['<','>'],$pricetag_content));
 
                     $priceTagCSS = $this->getViabillPricetagCSS($pricetag_params);                
                 }
 
                 if (!empty($pricetagScript) && is_string($output)) {
                     // Insert the script before </body> (assuming output is HTML)
-                    $output = str_replace('</body>', $pricetagScript . '</body>', $output);
+                    $output = str_replace('</body>', $priceTagCSS.$pricetagScript . '</body>', $output);
                 }                 
             }
         
         }
     }
     
-    private function getViabillPricetagScript(array $params): string {
+    private function getViabillPricetagScript(array $params, $priceTag_script): string {
         // 1) Build the <div> with all data- attributes
         $attrs = [
             'class="viabill-pricetag"',
@@ -532,9 +531,9 @@ class Viabill extends \Opencart\System\Engine\Controller {
             'data-currency="' . ($params['currency'] ?? '') . '"',
             'data-country-code="' . ($params['country']  ?? '') . '"',
             'data-language="' . ($params['language'] ?? '') . '"',
-        ];
+        ];                
   
-        // remove any empty attributes
+        // Remove any empty attributes
         $attrs = array_filter($attrs, fn($a) => strpos($a, '=""') === false);
 
         $alignment_wrapper_class = '';        
@@ -542,18 +541,21 @@ class Viabill extends \Opencart\System\Engine\Controller {
             case 'center':
             case 'right':
                 $alignment_wrapper_class = 'viabill_wrapper_alignment_'.$params['alignment'];
-                $this->document->addStyle('catalog/view/theme/stylesheet/pricetag.css');
+                // $this->document->addStyle('catalog/view/theme/stylesheet/pricetag.css');
                 break;
             default:
                 // Do nothing.
-        }
+        }        
   
         $pricetagDiv = '<div class="viabill-pricetag-'.$params['target'].'-wrapper '.$alignment_wrapper_class.'"><div ' . implode(' ', $attrs) . '></div></div>';
   
-        // 2) Grab placement parameters, with safe defaults
+        // Grab placement parameters, with safe defaults
         $appendSelector = addslashes($params['append_selector'] ?? '.price');
         $insertAfter    = !empty($params['append_after'])   ? 'true'  : 'false';
         $insertFirst    = !empty($params['append_first'])   ? 'true'  : 'false';
+
+        // Clean and insert the pricetag
+        $priceTag_script = str_replace(['<script>', '</script>'], ['',''], $priceTag_script);
   
         // 3) Build the JS
         $js = <<<JS
@@ -577,6 +579,8 @@ jQuery(function($){
     } else {
     \$els.before(pricetagHtml);
     }
+
+    {$priceTag_script}
 });
 </script>
 JS;
@@ -586,6 +590,7 @@ JS;
 
     private function getViabillPricetagCSS(array $params): string {
         $css = <<<CSS
+<style>
 /* Align PriceTags to the right */
 div.viabill_wrapper_alignment_right {
     display: flex;
@@ -618,8 +623,12 @@ div.viabill_wrapper_alignment_center .viabill-pricetag {
 div.viabill_wrapper_alignment_center .viabill-pricetag iframe.viabill {
     width: 100% !important;
 }
-
+</style>
 CSS;    
+        if (!empty($params['width'])) {
+            $css .= '<style> div.viabill-pricetag-'.$params['target'].'-wrapper div.viabill-pricetag { width: '.$params['width'].' !important;} </style>';
+        }
+
         return $css;
     }
 

@@ -326,23 +326,23 @@ class Viabill extends \Opencart\System\Engine\Model {
         return $query->num_rows ? $query->row['transaction_id'] : null;
     }       
 
-        /**
+    /**
      * Update transaction amounts for an order
      *
      * @param int $order_id The order ID
-     * @param float|null $captured_amount The total captured amount (or null to skip)
-     * @param float|null $refunded_amount The total refunded amount (or null to skip)
+     * @param float|null $captured_amount The amount to add to the captured total (or null to skip)
+     * @param float|null $refunded_amount The amount to add to the refunded total (or null to skip)
      * @return void
      */
     public function updateTransactionAmounts(int $order_id, ?float $captured_amount, ?float $refunded_amount): void {
         $fields = [];
 
         if (!is_null($captured_amount)) {
-            $fields[] = "`captured_amount` = '" . (float)$captured_amount . "'";
+            $fields[] = "`captured_amount` = `captured_amount` + " . (float)$captured_amount;
         }
 
         if (!is_null($refunded_amount)) {
-            $fields[] = "`refunded_amount` = '" . (float)$refunded_amount . "'";
+            $fields[] = "`refunded_amount` = `refunded_amount` + " . (float)$refunded_amount;
         }
 
         // Always update the modification date

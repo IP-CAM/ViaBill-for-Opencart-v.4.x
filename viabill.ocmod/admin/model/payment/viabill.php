@@ -87,8 +87,8 @@ class Viabill extends \Opencart\System\Engine\Model {
         $this->model_user_user_group->addPermission($user_group_id, 'modify', 'extension/viabill/payment/viabill'); 
 
         // Grant access & modify on the core order-info route
-        $this->model_user_user_group->addPermission($user_group_id, 'access', 'sale/order/info');
-        $this->model_user_user_group->addPermission($user_group_id, 'modify', 'sale/order/info');
+        $this->model_user_user_group->addPermission($user_group_id, 'access', 'sale/order.info');
+        $this->model_user_user_group->addPermission($user_group_id, 'modify', 'sale/order.info');
     }
     
     // Clean up on uninstallation
@@ -99,7 +99,7 @@ class Viabill extends \Opencart\System\Engine\Model {
         $this->model_setting_event->deleteEventByCode('viabill_cart_pricetag');
 
         // (Optional) Drop the transaction log table
-        $this->db->query("DROP TABLE IF EXISTS `" . DB_PREFIX . "viabill_transaction`;");
+        // $this->db->query("DROP TABLE IF EXISTS `" . DB_PREFIX . "viabill_transaction`;");
     }
 
     /**
@@ -251,6 +251,20 @@ class Viabill extends \Opencart\System\Engine\Model {
      * @return bool success
      */
     public function voidPayment(int $order_id): array {
+        // Load language class
+        $this->load->language('extension/viabill/payment/viabill');
+                
+        // Load order and transaction info from OpenCart
+        $this->load->model('sale/order');
+
+        // Load helper classes
+        $this->load->helper('extension/viabill/viabill_services');
+        $this->load->helper('extension/viabill/viabill_constants');
+        $this->load->helper('extension/viabill/viabill_helper');
+
+        $registry = $this->registry;
+        ViaBillServices::setRegistry($registry);
+
         $viaTransactionId = $this->getViaBillTransactionId($order_id);
         if (!$viaTransactionId) return false;
         // Prepare ViaBill void API request (placeholder endpoint)
@@ -269,7 +283,7 @@ class Viabill extends \Opencart\System\Engine\Model {
         if ($response['status'] == 'success') {
             // Typically, you’d have a specific "Cancelled" status ID configured or use OpenCart's "Cancelled" if exists            
             $cancelStatusId = $this->getOrderStatusIdByName('Voided') ?? $this->config->get('config_order_status_id');
-            $this->addOrderHistory->addHistory($order_id, $cancelStatusId, 'ViaBill authorization voided', false);
+            $this->addOrderHistory($order_id, $cancelStatusId, 'ViaBill authorization voided', false);            
             return ['success' => true];
         }
         return ['success' => false];
@@ -311,6 +325,33 @@ class Viabill extends \Opencart\System\Engine\Model {
         $query = $this->db->query("SELECT `transaction_id` FROM `" . DB_PREFIX . "viabill_transaction` WHERE `order_id` = " . (int)$order_id);
         return $query->num_rows ? $query->row['transaction_id'] : null;
     }       
+
+        /**
+     * Update transaction amounts for an order
+     *
+     * @param int $order_id The order ID
+     * @param float|null $captured_amount The total captured amount (or null to skip)
+     * @param float|null $refunded_amount The total refunded amount (or null to skip)
+     * @return void
+     */
+    public function updateTransactionAmounts(int $order_id, ?float $captured_amount, ?float $refunded_amount): void {
+        $fields = [];
+
+        if (!is_null($captured_amount)) {
+            $fields[] = "`captured_amount` = '" . (float)$captured_amount . "'";
+        }
+
+        if (!is_null($refunded_amount)) {
+            $fields[] = "`refunded_amount` = '" . (float)$refunded_amount . "'";
+        }
+
+        // Always update the modification date
+        $fields[] = "`date_modified` = NOW()";
+
+        if (!empty($fields)) {
+            $this->db->query("UPDATE `" . DB_PREFIX . "viabill_transaction` SET " . implode(', ', $fields) . " WHERE `order_id` = '" . (int)$order_id . "'");
+        }
+    }
     
     // Helper: find order status ID by name (for example "Refunded" or "Canceled")
     private function getOrderStatusIdByName(string $statusName): ?int {

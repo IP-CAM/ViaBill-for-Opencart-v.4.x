@@ -44,6 +44,24 @@ class Viabill extends \Opencart\System\Engine\Model {
         // Define method data
         $method_data = [];
 
+        $hide_bnpl = $this->config->get('payment_viabill_hide_bnpl');
+        $hide_tbyb = $this->config->get('payment_viabill_hide_tbyb');
+
+        $payment_options = [];
+
+        if (!$hide_bnpl) {
+            $payment_options['viabill_bnpl'] = [
+                'code'  => 'viabill.viabill_bnpl',
+                'name'  => $this->language->get('text_bnpl_title')
+            ];
+        }
+        if (!$hide_tbyb) {
+            $payment_options['viabill_tbyb'] = [
+                'code'  => 'viabill.viabill_tbyb',
+                'name'  => $this->language->get('text_tbyb_title')
+            ];
+        }
+
         if ($status) {
             $method_data = [
                 'code'       => 'viabill',
@@ -51,16 +69,7 @@ class Viabill extends \Opencart\System\Engine\Model {
                 'terms'      => '',
                 'test_mode_warning' => 'Test mode is enabled. This payment will be processed in the ViaBill sandbox environment.',
                 'sort_order' => $this->config->get('payment_viabill_sort_order'),
-                'option'     => [
-                    'viabill_bnpl' => [
-                        'code'  => 'viabill.viabill_bnpl',
-                        'name'  => $this->language->get('text_bnpl_title')
-                    ],
-                    'viabill_tbyb' => [
-                        'code'  => 'viabill.viabill_tbyb',
-                        'name'  => $this->language->get('text_tbyb_title')
-                    ]
-                ]
+                'option'     => $payment_options
             ];
             
         }
@@ -88,15 +97,26 @@ class Viabill extends \Opencart\System\Engine\Model {
      * Update transaction amounts for an order
      *
      * @param int $order_id The order ID
-     * @param float $captured_amount The total captured amount
-     * @param float $refunded_amount The total refunded amount
+     * @param float|null $captured_amount The total captured amount (or null to skip)
+     * @param float|null $refunded_amount The total refunded amount (or null to skip)
      * @return void
      */
-    public function updateTransactionAmounts(int $order_id, float $captured_amount, float $refunded_amount): void {
-        $this->db->query("UPDATE `" . DB_PREFIX . "viabill_transaction` SET 
-            `captured_amount` = '" . (float)$captured_amount . "', 
-            `refunded_amount` = '" . (float)$refunded_amount . "', 
-            `date_modified` = NOW() 
-            WHERE `order_id` = '" . (int)$order_id . "'");
+    public function updateTransactionAmounts(int $order_id, ?float $captured_amount, ?float $refunded_amount): void {
+        $fields = [];
+
+        if (!is_null($captured_amount)) {
+            $fields[] = "`captured_amount` = '" . (float)$captured_amount . "'";
+        }
+
+        if (!is_null($refunded_amount)) {
+            $fields[] = "`refunded_amount` = '" . (float)$refunded_amount . "'";
+        }
+
+        // Always update the modification date
+        $fields[] = "`date_modified` = NOW()";
+
+        if (!empty($fields)) {
+            $this->db->query("UPDATE `" . DB_PREFIX . "viabill_transaction` SET " . implode(', ', $fields) . " WHERE `order_id` = '" . (int)$order_id . "'");
+        }
     }
 }

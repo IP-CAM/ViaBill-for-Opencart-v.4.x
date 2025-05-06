@@ -8,7 +8,7 @@ namespace Opencart\System\Helper\Extension\Viabill;
 class ViaBillServices {
   const ADDON_NAME = ViaBillConstants::AFFILIATE;
   const API_PROTOCOL = ViaBillConstants::PROTOCOL;
-  const BASE_URL = 'https://secure-test.viabill.com';      
+  const BASE_URL = 'https://secure.viabill.com';
 
   private static $registry = null;  
 

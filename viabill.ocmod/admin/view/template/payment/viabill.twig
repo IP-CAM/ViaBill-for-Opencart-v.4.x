@@ -88,9 +88,9 @@
             </div>                   
             
             <div class="row mb-3">
-              <label class="col-sm-2 col-form-label" for="input-order-status">{{ entry_authorize_order_status }}</label>
+              <label class="col-sm-2 col-form-label" for="input-authorize-order-status">{{ entry_authorize_order_status }}</label>
               <div class="col-sm-10">
-                <select name="payment_viabill_authorize_order_status_id" id="input-order-status" class="form-select">
+                <select name="payment_viabill_authorize_order_status_id" id="input-authorize-order-status" class="form-select">
                   {% for status in order_statuses %}
                     <option value="{{ status.order_status_id }}" {{ status.order_status_id == payment_viabill_authorize_order_status_id ? 'selected' : '' }}>
                       {{ status.name }}
@@ -101,9 +101,9 @@
             </div>
 
             <div class="row mb-3">
-              <label class="col-sm-2 col-form-label" for="input-order-status">{{ entry_capture_order_status }}</label>
+              <label class="col-sm-2 col-form-label" for="input-capture-order-status">{{ entry_capture_order_status }}</label>
               <div class="col-sm-10">
-                <select name="payment_viabill_capture_order_status_id" id="input-order-status" class="form-select">
+                <select name="payment_viabill_capture_order_status_id" id="input-capture-order-status" class="form-select">
                   {% for status in order_statuses %}
                     <option value="{{ status.order_status_id }}" {{ status.order_status_id == payment_viabill_capture_order_status_id ? 'selected' : '' }}>
                       {{ status.name }}
@@ -119,6 +119,26 @@
                 <select name="payment_viabill_status" id="input-status" class="form-select">
                   <option value="1" {{ payment_viabill_status ? 'selected' : '' }}>{{ text_enabled }}</option>
                   <option value="0" {{ not payment_viabill_status ? 'selected' : '' }}>{{ text_disabled }}</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <label class="col-sm-2 col-form-label" for="input-hide-bnpl">{{ entry_hide_bnpl }}</label>
+              <div class="col-sm-10">
+                <select name="payment_viabill_hide_bnpl" id="input-hide-bnpl" class="form-select">
+                  <option value="1" {{ payment_viabill_hide_bnpl ? 'selected' : '' }}>{{ text_enabled }}</option>
+                  <option value="0" {{ not payment_viabill_hide_bnpl ? 'selected' : '' }}>{{ text_disabled }}</option>
+                </select>
+              </div>
+            </div>
+			
+			      <div class="row mb-3">
+              <label class="col-sm-2 col-form-label" for="input-hide-tbyb">{{ entry_hide_tbyb }}</label>
+              <div class="col-sm-10">
+                <select name="payment_viabill_hide_tbyb" id="input-hide-tbyb" class="form-select">
+                  <option value="1" {{ payment_viabill_hide_tbyb ? 'selected' : '' }}>{{ text_enabled }}</option>
+                  <option value="0" {{ not payment_viabill_hide_tbyb ? 'selected' : '' }}>{{ text_disabled }}</option>
                 </select>
               </div>
             </div>

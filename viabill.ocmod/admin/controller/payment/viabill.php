@@ -61,6 +61,14 @@ class Viabill extends \Opencart\System\Engine\Controller {
                                 'user_token=' . $this->session->data['user_token']);
         $data['cancel'] = $this->url->link('marketplace/extension', 
                                'user_token=' . $this->session->data['user_token'] . '&type=payment');
+
+        // Load list of order statuses for the dropdown
+        $this->load->model('localisation/order_status');
+        $data['order_statuses'] = $this->model_localisation_order_status->getOrderStatuses();
+
+        // Set default values by name
+        $default_authorized_order_status = $this->getOrderStatusIdByName('Processing', $data['order_statuses']) ?? 0;
+        $default_captured_order_status = $this->getOrderStatusIdByName('Complete', $data['order_statuses']) ?? 0;
         
         // Load existing configuration values (or defaults if not set)
         $data['payment_viabill_status'] = $this->config->get('payment_viabill_status') ?? 0;
@@ -69,9 +77,12 @@ class Viabill extends \Opencart\System\Engine\Controller {
         $data['payment_viabill_test'] = $this->config->get('payment_viabill_test') ?? 0;
         $data['payment_viabill_transaction_mode'] = $this->config->get('payment_viabill_transaction_mode') ?? 'authorize_capture';
         $data['payment_viabill_pricetag'] = $this->config->get('payment_viabill_pricetag') ?? '';
-        $data['payment_viabill_authorize_order_status_id'] = $this->config->get('payment_viabill_authorize_order_status_id') ?? $this->config->get('config_order_status_id');
-        $data['payment_viabill_capture_order_status_id'] = $this->config->get('payment_viabill_capture_order_status_id') ?? $this->config->get('config_order_status_id');
+        $data['payment_viabill_authorize_order_status_id'] = $this->config->get('payment_viabill_authorize_order_status_id') ?? $default_authorized_order_status;
+        $data['payment_viabill_capture_order_status_id'] = $this->config->get('payment_viabill_capture_order_status_id') ?? $default_captured_order_status;
         $data['payment_viabill_sort_order'] = $this->config->get('payment_viabill_sort_order') ?? 0;
+
+        $data['payment_viabill_hide_bnpl'] = $this->config->get('payment_viabill_hide_bnpl') ?? 0;
+        $data['payment_viabill_hide_tbyb'] = $this->config->get('payment_viabill_hide_tbyb') ?? 1;
 
         // Add Geo Zone configuration
         $data['payment_viabill_geo_zone_id'] = $this->config->get('payment_viabill_geo_zone_id') ?? 0;
@@ -94,11 +105,7 @@ class Viabill extends \Opencart\System\Engine\Controller {
         $data['login_action'] = $this->url->link('extension/viabill/payment/viabill.login', 
                                 'user_token=' . $this->session->data['user_token']);
         $data['register_action'] = $this->url->link('extension/viabill/payment/viabill.register', 
-                                    'user_token=' . $this->session->data['user_token']);
-        
-        // Load list of order statuses for the dropdown
-        $this->load->model('localisation/order_status');
-        $data['order_statuses'] = $this->model_localisation_order_status->getOrderStatuses();
+                                    'user_token=' . $this->session->data['user_token']);                
         
         // Load geo zones for the dropdown
         $this->load->model('localisation/geo_zone');
@@ -413,12 +420,13 @@ class Viabill extends \Opencart\System\Engine\Controller {
 
             if ($result['success']) {
                 $this->session->data['success'] = $this->language->get('text_capture_success');
+                $this->model_extension_viabill_payment_viabill->updateTransactionAmounts($order_id, $capture_amount, null);
             } else {
                 $this->session->data['error'] = $this->language->get('text_capture_error') . ' ' . $result['message'];
             }
         }
 
-        $this->response->redirect($this->url->link('sale/order/info', 'user_token=' . $this->session->data['user_token'] . '&order_id=' . $order_id));
+        $this->response->redirect($this->url->link('sale/order.info', 'user_token=' . $this->session->data['user_token'] . '&order_id=' . $order_id));
     }
 
     /**
@@ -437,12 +445,13 @@ class Viabill extends \Opencart\System\Engine\Controller {
 
             if ($result['success']) {
                 $this->session->data['success'] = $this->language->get('text_refund_success');
+                $this->model_extension_viabill_payment_viabill->updateTransactionAmounts($order_id, null, $refund_amount);
             } else {
                 $this->session->data['error'] = $this->language->get('text_refund_error') . ' ' . $result['message'];
             }
         }
 
-        $this->response->redirect($this->url->link('sale/order/info', 'user_token=' . $this->session->data['user_token'] . '&order_id=' . $order_id));
+        $this->response->redirect($this->url->link('sale/order.info', 'user_token=' . $this->session->data['user_token'] . '&order_id=' . $order_id));
     }
 
     /**
@@ -465,7 +474,23 @@ class Viabill extends \Opencart\System\Engine\Controller {
             }
         }
 
-        $this->response->redirect($this->url->link('sale/order/info', 'user_token=' . $this->session->data['user_token'] . '&order_id=' . $order_id));
+        $this->response->redirect($this->url->link('sale/order.info', 'user_token=' . $this->session->data['user_token'] . '&order_id=' . $order_id));
+    }
+
+    /**
+    * Get the order status ID by its name.
+    *
+    * @param string $name The order status name to search for (e.g., "Processing")
+    * @param array $order_statuses The list returned by getOrderStatuses()
+    * @return int|null The matching order status ID or null if not found
+    */
+    private function getOrderStatusIdByName(string $name, array $order_statuses): ?int {
+        foreach ($order_statuses as $status) {
+            if (strcasecmp($status['name'], $name) === 0) {
+                return (int)$status['order_status_id'];
+            }
+        }
+        return null;
     }
     
     // (Optional) Installation hook – called when installing the extension

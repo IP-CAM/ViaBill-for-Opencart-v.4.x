@@ -2,7 +2,7 @@
 // Text
 $_['text_title']  = 'ViaBill Payments';
 $_['text_bnpl_title']  = 'Easy Monthly Payments';
-$_['text_tbyb_title']  = 'Try Before you Buy';
+$_['text_tbyb_title']  = 'Pay in 30 Days';
 $_['text_redirecting'] = 'You will be redirected to ViaBill to complete your payment...';
 $_['text_test_mode_warning'] = 'Test mode is enabled.';
 

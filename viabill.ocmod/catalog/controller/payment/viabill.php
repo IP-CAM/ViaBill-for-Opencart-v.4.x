@@ -111,12 +111,23 @@ class Viabill extends \Opencart\System\Engine\Controller {
         $transactionId = 'via-' . $order_id . '-' . substr(md5(rand()), 0, 6);  // Generate a unique transaction reference (via-<orderid>-<random>)
         
         // Prepare customer info for customParams (e.g., name, email, phone)
-        $customer = [
-            'name'    => $order_info['firstname'] . ' ' . $order_info['lastname'],
-            'email'   => $order_info['email'],
-            'phone'   => $order_info['telephone'],
-            'address' => $order_info['payment_address_1'] . ' ' . $order_info['payment_city'] . ' ' . $order_info['payment_postcode'] . ', ' . $order_info['payment_country']
-        ];
+        $address = empty($order_info['payment_address_1'])?$order_info['shipping_address_1']:$order_info['payment_address_1'];
+        $city = empty($order_info['payment_city'])?$order_info['shipping_city']:$order_info['payment_city'];
+        $postalCode = empty($order_info['payment_postcode'])?$order_info['shipping_postcode']:$order_info['payment_postcode'];
+        $country = !empty($order_info['shipping_iso_code_2'])?strtolower($order_info['shipping_iso_code_2']):'';
+
+        $customer = [            
+            'email'=> $order_info['email'],
+            'phoneNumber' => $order_info['telephone'],            
+            'firstName' => $order_info['firstname'],
+            'lastName' => $order_info['lastname'],
+            'fullName' => trim($order_info['firstname'].' '.$order_info['lastname']),
+            'address' => $address,
+            'city' => $city,
+            'postalCode' => $postalCode,
+            'country' => $country
+        ];        
+
         // Prepare cart info for cartParams (e.g., products in the order)
         $products = $this->cart->getProducts();
         $cartItems = [];
@@ -178,7 +189,7 @@ class Viabill extends \Opencart\System\Engine\Controller {
             'cancel_url'   => $cancel_url,
             'callback_url' => $callback_url,
             'test'         => $testMode,
-            // 'customParams' => json_encode($customer),
+            'customParams' => $customer,
             // 'cartParams'   => json_encode($cart),
             $checksum_key  => $checksum_value,
             'tbyb'         => $tbybValue,            
@@ -189,15 +200,9 @@ class Viabill extends \Opencart\System\Engine\Controller {
         $this->model_checkout_order->addHistory($order_id, $pendingStatusId, 'ViaBill payment initiated. Transaction: ' . $transactionId, false);
         
         $checkout_endpoint = ViaBillServices::getEndPointData('checkout', $request_data);                
-
-        $debug_request_str = print_r($checkout_endpoint, true);
-        ViaBillHelper::log('Checkout Endpoint: ' . $debug_request_str);        
-        
+                
         // Send the checkout-authorize request to ViaBill
-        $viaResponse = ViaBillHelper::sendApiRequest($checkout_endpoint['endpoint'], $checkout_endpoint['data']);
-
-        $debug_request_str = print_r($viaResponse, true);
-        ViaBillHelper::log('Checkout Response: ' . $debug_request_str);
+        $viaResponse = ViaBillHelper::sendApiRequest($checkout_endpoint['endpoint'], $checkout_endpoint['data']);        
 
         if (!empty($viaResponse['redirect_url'])) {
             // Store the generated transaction ID in our database for reference (log it)
@@ -227,17 +232,83 @@ class Viabill extends \Opencart\System\Engine\Controller {
      * It should update the order status accordingly.
      */
     public function callback(): void {
-        // Retrieve data from ViaBill (assuming it's a POST callback)
-        $callbackData = $this->request->post;  // or $this->request->get depending on ViaBill implementation
-        // For security, verify the callback (e.g., check md5 or a signature, and apikey/secret)
-        $order_id = $callbackData['order_number'] ?? 0;
+        // Load helper function manually, since this is a callback        
+        require_once(DIR_EXTENSION . 'viabill/system/helper/viabill_constants.php');
+		require_once(DIR_EXTENSION . 'viabill/system/helper/viabill_helper.php');
+
+        // Retrieve data from ViaBill, using various methods
+		$callbackData = null;
+		
+		// Method 1: Try OpenCart's request object
+		if (!empty($this->request->post)) {
+			$callbackData = $this->request->post;
+		}
+		// Method 2: Try raw POST data
+		else {
+			$rawData = file_get_contents('php://input');
+			
+			if (!empty($rawData)) {
+				// Try JSON decode
+				$jsonData = json_decode($rawData, true);
+				if (json_last_error() === JSON_ERROR_NONE) {
+					$callbackData = $jsonData;
+				}
+				// Try form-encoded data
+				else {
+					parse_str($rawData, $callbackData);
+				}
+			}
+			// Method 3: Fallback to $_POST
+			else if (!empty($_POST)) {
+				$callbackData = $_POST;
+			}
+		}
+		
+		if (empty($callbackData)) {			
+			ViaBillHelper::log('Received an callback request with empty data', 'error');
+			return;
+		}
+
+        $order_id = $callbackData['orderNumber'] ?? 0;
         $transactionId = $callbackData['transaction'] ?? '';
-        $status = strtolower($callbackData['status'] ?? '');  // e.g., 'paid', 'cancelled', 'refunded', 'voided'
+        $status = $callbackData['status'] ?? '';  // e.g., 'APPROVED', 'CANCELLED', 'REJECTED'
         
         $this->load->model('checkout/order');        
         $this->load->model('extension/viabill/payment/viabill');   
         
         if ($order_id && $transactionId) {
+            // first of all, verify that this is a valid callback request
+            $amount = $callbackData['amount'];
+            $currency = $callbackData['currency'];
+            $status = $callbackData['status'];
+            $time = $callbackData['time'];
+
+            $callback_signature = $callbackData['signature'];
+
+            $secret = $this->config->get('payment_viabill_secret_key') ?? '';
+
+            $validation_arguments = [
+                $transactionId,
+                $order_id,
+                $amount,
+                $currency,
+                $status,
+                $time,
+                $secret
+            ];
+
+            if (ViaBillConstants::PROTOCOL == '3.0') {                
+                $calculated_signature = md5(implode('#', $validation_arguments));
+            } else {                
+                $calculated_signature = hash('sha256', implode('#', $validation_arguments));
+            }
+
+            if ($callback_signature != $calculated_signature) {
+                $debug_str = print_r($callbackData, true);
+                ViaBillHelper::log('Received an invalid callback request:'.$debug_str, 'error');
+                return;
+            }
+
             // Match the callback data with our stored transaction (to ensure it’s valid)
             $query = $this->db->query("SELECT * FROM `" . DB_PREFIX . "viabill_transaction` WHERE order_id = " . (int)$order_id . " AND transaction_id = '" . $this->db->escape($transactionId) . "'");
             if ($query->num_rows) {
@@ -245,40 +316,32 @@ class Viabill extends \Opencart\System\Engine\Controller {
                 $comment = 'ViaBill: ';
                 $notifyCustomer = true;
                                 
-                if ($status == 'paid' || $status == 'captured' || $status == 'authorized') {
+                if ($status == 'APPROVED') {
+                    $payment_type = $this->config->get('payment_viabill_transaction_mode');
+
                     // Payment completed (or at least authorized)
                     $comment .= 'Payment successful.';
-                    if ($status == 'authorized' && $this->config->get('payment_viabill_transaction_mode') == 'authorize') {
-                        $comment .= ' (Authorized only, awaiting capture)';
-                        // If authorized-only, you might set a different status, e.g., "Pending Payment"
-                    }
-
                     // Set the new order status
                     $newStatusId = null;
-                    $payment_type = $this->config->get('payment_viabill_transaction_mode');
                     if ($payment_type == 'authorize') {
+                        $comment .= ' (Authorized only, awaiting capture)';
                         $newStatusId = $this->config->get('payment_viabill_authorize_order_status_id') ?: $this->config->get('config_order_status_id');
-                    } else {  // authorize_capture                       
-                        $newStatusId = $this->config->get('payment_viabill_capture_order_status_id') ?: $this->config->get('config_order_status_id');
-                    }  
+                    } else {
+                        $newStatusId = $this->config->get('payment_viabill_capture_order_status_id') ?: $this->config->get('config_order_status_id');                            
+                    }                                        
 
                     // Update transaction table status
                     $this->db->query("UPDATE `" . DB_PREFIX . "viabill_transaction` SET status = 'PAID' WHERE order_id = " . (int)$order_id);
                                                                  
                     // (Optionally, if auth-only, set notifyCustomer = false to not send final email until capture)
-                } elseif ($status == 'cancelled' || $status == 'canceled') {
+                } elseif ($status == 'CANCELLED') {
                     $newStatusId = $this->getOrderStatusIdByName('Canceled') ?? $this->config->get('config_order_status_id');
-                    $comment .= 'Payment was cancelled or failed.';
+                    $comment .= 'Payment was cancelled.';
                     $notifyCustomer = false;  // No need to notify for cancel in some cases
                     $this->db->query("UPDATE `" . DB_PREFIX . "viabill_transaction` SET status = 'CANCELLED' WHERE order_id = " . (int)$order_id);
-                } elseif ($status == 'refunded') {
-                    $newStatusId = $this->getOrderStatusIdByName('Refunded') ?? $newStatusId;
-                    $comment .= 'Payment refunded.';
-                    $notifyCustomer = true;
-                    $this->db->query("UPDATE `" . DB_PREFIX . "viabill_transaction` SET status = 'REFUNDED' WHERE order_id = " . (int)$order_id);
-                } elseif ($status == 'voided') {
+                } elseif ($status == 'REJECTED') {
                     $newStatusId = $this->getOrderStatusIdByName('Canceled') ?? $newStatusId;
-                    $comment .= 'Payment voided (authorization cancelled).';
+                    $comment .= 'Payment was rejected by the ViaBill Gateway or failed.';
                     $notifyCustomer = false;
                     $this->db->query("UPDATE `" . DB_PREFIX . "viabill_transaction` SET status = 'VOIDED' WHERE order_id = " . (int)$order_id);
                 } else {

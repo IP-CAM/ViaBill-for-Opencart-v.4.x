@@ -187,6 +187,90 @@ class Viabill extends \Opencart\System\Engine\Controller {
         }        
     }
 
+    // Get MyViaBill
+    public function getMyViaBill(): string {
+        $myViaBillURL = null;
+
+        $this->load->helper('extension/viabill/viabill_constants');
+        $this->load->helper('extension/viabill/viabill_services');
+        $this->load->helper('extension/viabill/viabill_helper');                    
+
+        $key = $this->config->get('payment_viabill_api_key') ?? '';
+        $secret = $this->config->get('payment_viabill_secret_key') ?? '';
+
+        if (!empty($key) && !empty($secret)) {
+            // Get myviabill endpoint
+            $myviabill_endpoint = ViaBillServices::getApiEndPoint('myviabill');
+
+            if (ViaBillConstants::PROTOCOL == '3.0') {                
+                $signature = md5($key . '#' . $secret);
+            } else {                
+                $signature = hash('sha256', $key . '#' . $secret);
+            }            
+
+            // Prepare  data
+            $myviabill_data = [
+                'key' => $key,
+                'signature' => $signature,
+            ];            
+                                        
+            // Send registration request to ViaBill API            
+            $response = ViaBillHelper::sendApiRequest($myviabill_endpoint['endpoint'], $myviabill_data, $myviabill_endpoint['method']);
+                
+            if (isset($response['status']) && $response['status'] === 'success') {
+                // Extract API credentials from response
+                $api_data = json_decode($response['body'], true);
+				if (isset($api_data['url'])) {
+					$myViaBillURL = $api_data['url'];
+				}             
+            }
+        }    
+
+        return $myViaBillURL;
+    }
+
+    // Get MyViaBill
+    public function getViaBillNotifications(): array {
+        $messages = [];
+
+        $this->load->helper('extension/viabill/viabill_constants');
+        $this->load->helper('extension/viabill/viabill_services');
+        $this->load->helper('extension/viabill/viabill_helper');                    
+
+        $key = $this->config->get('payment_viabill_api_key') ?? '';
+        $secret = $this->config->get('payment_viabill_secret_key') ?? '';
+
+        if (!empty($key) && !empty($secret)) {
+            // Get notifications endpoint
+            $notifications_endpoint = ViaBillServices::getApiEndPoint('notifications');
+
+            if (ViaBillConstants::PROTOCOL == '3.0') {                
+                $signature = md5($key . '#' . $secret);
+            } else {                
+                $signature = hash('sha256', $key . '#' . $secret);
+            }            
+
+            // Prepare  data
+            $notifications_data = [
+                'key' => $key,
+                'signature' => $signature,
+            ];            
+                                        
+            // Send registration request to ViaBill API            
+            $response = ViaBillHelper::sendApiRequest($notifications_endpoint['endpoint'], $notifications_data, $notifications_endpoint['method']);
+                
+            if (isset($response['status']) && $response['status'] === 'success') {
+                // Extract API credentials from response
+                $api_data = json_decode($response['body'], true);
+				if (isset($api_data['messages'])) {
+					$messages = $api_data['messages'];
+				}          
+            }
+        }
+
+        return $messages;
+    }
+
     // Handle ViaBill login
     public function login(): void {
         $this->load->language('extension/viabill/payment/viabill');

@@ -131,17 +131,10 @@
                   <option value="0" {{ not payment_viabill_hide_bnpl ? 'selected' : '' }}>{{ text_disabled }}</option>
                 </select>
               </div>
-            </div>
-			
-			      <div class="row mb-3">
-              <label class="col-sm-2 col-form-label" for="input-hide-tbyb">{{ entry_hide_tbyb }}</label>
-              <div class="col-sm-10">
-                <select name="payment_viabill_hide_tbyb" id="input-hide-tbyb" class="form-select">
-                  <option value="1" {{ payment_viabill_hide_tbyb ? 'selected' : '' }}>{{ text_enabled }}</option>
-                  <option value="0" {{ not payment_viabill_hide_tbyb ? 'selected' : '' }}>{{ text_disabled }}</option>
-                </select>
-              </div>
-            </div>
+            </div>					      
+
+            <!-- hide TBYB option by default -->            
+            <input type="hidden" name="payment_viabill_hide_tbyb" id="input-hide-tbyb" value="1" />
 
             <div class="row mb-3">
               <label for="input-geo-zone" class="col-sm-2 col-form-label">{{ entry_geo_zone }}</label>

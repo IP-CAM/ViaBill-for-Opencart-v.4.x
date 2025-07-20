@@ -1,7 +1,7 @@
 <?php
 // Text
 $_['text_title']             = 'ViaBill-betalinger';
-$_['text_bnpl_title']        = 'Enkle månedlige betalinger';
+$_['text_bnpl_title']        = 'Pay Later';
 $_['text_tbyb_title']        = 'Betal inden for 30 dage';
 $_['text_redirecting']       = 'Du bliver omdirigeret til ViaBill for at gennemføre din betaling...';
 $_['text_test_mode_warning'] = 'Testtilstand er aktiveret.';

@@ -197,7 +197,7 @@ class Viabill extends \Opencart\System\Engine\Controller {
         
         // Before redirecting, add an initial order history entry with "Pending" status (or a custom status like "Awaiting Payment")
         $pendingStatusId = $this->config->get('config_order_status_id');  // default store pending status
-        $this->model_checkout_order->addHistory($order_id, $pendingStatusId, 'ViaBill payment initiated. Transaction: ' . $transactionId, false);
+        $this->model_checkout_order->addOrderHistory($order_id, $pendingStatusId, 'ViaBill payment initiated. Transaction: ' . $transactionId, false);
         
         $checkout_endpoint = ViaBillServices::getEndPointData('checkout', $request_data);                
                 
@@ -327,7 +327,43 @@ class Viabill extends \Opencart\System\Engine\Controller {
                         $comment .= ' (Authorized only, awaiting capture)';
                         $newStatusId = $this->config->get('payment_viabill_authorize_order_status_id') ?: $this->config->get('config_order_status_id');
                     } else {
-                        $newStatusId = $this->config->get('payment_viabill_capture_order_status_id') ?: $this->config->get('config_order_status_id');                            
+                        $capture_amount = $amount;          
+                                                                  
+                        $capture_data = [
+                            'apikey'      => $api_key,
+                            'secret'      => $secret,
+                            'transaction' => $transactionId,
+                            'amount'      => $amount,
+                            'currency'    => $currency
+                        ];
+                      
+                      	try {
+                            $result = $this->model_extension_payment_viabill->capturePayment($capture_data);
+                        } catch (Exception $e) {
+                            ViaBillHelper::log('Capture payment failed: ' . $e->getMessage(), 'error');
+                            $result = [
+                                'success' => false,
+                                'message' => 'Capture failed: ' . $e->getMessage()
+                            ];
+                        } catch (Error $e) {
+                            ViaBillHelper::log('Fatal error during capture: ' . $e->getMessage(), 'error');
+                            $result = [
+                                'success' => false,
+                                'message' => 'System error during capture: ' . $e->getMessage()
+                            ];
+                        }
+
+                        if ($result['success']) {                                 
+                            $this->model_extension_payment_viabill->updateTransactionAmounts($order_id, $capture_amount, null);
+                            $newStatusId = $this->config->get('payment_viabill_capture_order_status_id') ?: $this->config->get('config_order_status_id');
+                        
+                            // Update OpenCart order history with the determined status and comment
+                            // $comment = 'Payment was captured';
+                            $this->model_checkout_order->addOrderHistory($order_id, $newStatusId, $comment, $notifyCustomer);
+                        
+                        } else {
+                            ViaBillHelper::log('Capture was failed:'.$result['message'], 'error');
+                        }                        
                     }                                        
 
                     // Update transaction table status
@@ -350,7 +386,7 @@ class Viabill extends \Opencart\System\Engine\Controller {
                 }
                 
                 // Update OpenCart order history with the determined status and comment
-                $this->model_checkout_order->addHistory($order_id, $newStatusId, $comment, $notifyCustomer);
+                $this->model_checkout_order->addOrderHistory($order_id, $newStatusId, $comment, $notifyCustomer);
             }
         }
 

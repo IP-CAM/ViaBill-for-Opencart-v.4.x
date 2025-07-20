@@ -1,7 +1,7 @@
 <?php
 // Text
 $_['text_title']             = 'Pagos de ViaBill';
-$_['text_bnpl_title']        = 'Pagos mensuales fáciles';
+$_['text_bnpl_title']        = 'Pay Later';
 $_['text_tbyb_title']        = 'Pagar en 30 días';
 $_['text_redirecting']       = 'Será redirigido a ViaBill para completar su pago...';
 $_['text_test_mode_warning'] = 'El modo de prueba está activado.';

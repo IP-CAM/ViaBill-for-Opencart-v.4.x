@@ -290,7 +290,7 @@ class Viabill extends \Opencart\System\Engine\Model {
     }
 
     /**
-     * Add an order-history record (same as catalog/model/checkout/order->addHistory).
+     * Add an order-history record (same as catalog/model/checkout/order->addOrderHistory).
      */
     private function addOrderHistory(
         int   $order_id,

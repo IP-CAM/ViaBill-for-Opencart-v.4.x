@@ -75,7 +75,7 @@ class ViaBillHelper {
    * Get the ViaBill platform (affiliate) for this module.
    */
   public static function getViaBillApiPlatform() {
-    return ViaBillConstants::API_PLATFORM;
+    return ViaBillConstants::AFFILIATE;
   }
 
   /**
